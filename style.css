@@ -1,0 +1,97 @@
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  background-color: #f4f4f4;
+}
+
+#gameArea {
+  position: relative;
+  width: 100%;
+  height: 90vh;
+  background-color: #fbf5f5;
+  border: 2px solid #ccc;
+  overflow: hidden;
+  max-width: 600px;
+  margin: auto;
+}
+
+#player {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  width: 50px;
+  height: 50px;
+  background-color: rgb(39, 39, 111);
+  transition: left 0.1s;
+}
+h1 span{
+  font-size: 0.3em;
+}
+.obstacle {
+  position: absolute;
+  width: 10%;
+  height: 20px;
+  background-color: rgb(181, 238, 49);
+}
+
+.laser {
+  position: absolute;
+  width: 2%;
+  height: 4% ;
+  background-color: rgb(248, 8, 8);
+  z-index: 10;
+}
+
+#score {
+  font-size: 24px;
+  margin-top: 20px;
+}
+
+
+@media (max-width: 768px) {
+  #player {
+    width: 40px;
+    height: 40px;
+  }
+
+  .obstacle {
+    width: 8%;
+    height: 8%;
+  }
+
+  .laser {
+    width: 1.5%;
+    height: 3%;
+  }
+
+  #score {
+    font-size: 18px;
+  }
+
+  #controls {
+    position: fixed;
+    bottom: 20px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  #controls button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    font-size: 24px;
+    background-color: #333;
+    color: white;
+    border: none;
+    cursor: pointer;
+    outline: none;
+  }
+
+  #controls button:active {
+    background-color: #555;
+  }
+}
