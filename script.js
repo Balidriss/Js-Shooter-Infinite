@@ -68,11 +68,27 @@ function movePlayer(direction) {
 }
 
 // Crée un obstacle et l'ajoute à la liste
-function createObstacle() {
+function createObstacle(type = "normal") {
   const obstacle = document.createElement('div');
   obstacle.classList.add('obstacle');
-  obstacle.style.left = `${Math.random() * (gameArea.clientWidth - gameArea.clientWidth * 0.1)}px`; // Adjust width dynamically
+  obstacle.dataset.type = type;
+
+  obstacle.style.left = `${Math.random() * (gameArea.clientWidth - gameArea.clientWidth * 0.1)}px`;
   obstacle.style.top = '0px';
+
+  //vitesse : 1 = trés lent, 10 = trés rapide
+  if (type === "fast") {
+    obstacle.dataset.speed = 4; //
+    obstacle.style.backgroundColor = "red";
+  } else if (type === "shooter") {
+    obstacle.dataset.speed = 2; //
+    obstacle.style.backgroundColor = "purple";
+    obstacle.dataset.shootTimer = Math.random() * 2000 + 1000;
+  } else {
+    obstacle.dataset.speed = 2; //
+    obstacle.style.backgroundColor = "green";
+  }
+
   gameArea.appendChild(obstacle);
   obstacles.push(obstacle);
 }
@@ -81,8 +97,18 @@ function createObstacle() {
 function shootLaser() {
   const laser = document.createElement('div');
   laser.classList.add('laser');
-  laser.style.left = `${playerPosition + player.clientWidth / 2 - 2}px`; // Dynamically center laser
+  laser.style.left = `${playerPosition + player.clientWidth / 2 - 2}px`;
   laser.style.top = `${player.offsetTop}px`;
+  gameArea.appendChild(laser);
+  lasers.push(laser);
+}
+// enemies peuvent tirer des lasers
+function shootObstacleLaser(obstacle) {
+  const laser = document.createElement('div');
+  laser.classList.add('laser');
+  laser.style.left = `${parseInt(obstacle.style.left) + obstacle.offsetWidth / 2 - 2}px`;
+  laser.style.top = `${parseInt(obstacle.style.top) + obstacle.offsetHeight}px`;
+  laser.dataset.type = "enemy";
   gameArea.appendChild(laser);
   lasers.push(laser);
 }
@@ -90,47 +116,75 @@ function shootLaser() {
 // Déplace les obstacles et gère les collisions
 function moveObstacles() {
   obstacles.forEach((obstacle) => {
+    const speed = parseInt(obstacle.dataset.speed);
     let obstacleTop = parseInt(obstacle.style.top);
-    obstacle.style.top = `${obstacleTop + 2}px`;
+    obstacle.style.top = `${obstacleTop + speed}px`;
 
-
+    // Supprimer les obstacles hors écran
     if (obstacleTop > gameArea.clientHeight) {
       obstacle.remove();
       obstacles = obstacles.filter((obs) => obs !== obstacle);
+      return;
     }
 
     // La condition de perdre la partie : se prendre un obstacle
     if (detectCollision(player, obstacle)) {
       endGame();
+      return;
+    }
+
+    // obstacle enemy ayant la capacité de tirer des lasers
+    if (obstacle.dataset.type === "shooter") {
+      obstacle.dataset.shootTimer -= 15;
+      if (obstacle.dataset.shootTimer <= 0) {
+        shootObstacleLaser(obstacle);
+        obstacle.dataset.shootTimer = Math.random() * 2000 + 1000;
+      }
     }
   });
 }
+
+// laser enemie et joueur
 function moveLasers() {
   lasers.forEach((laser) => {
     let laserTop = parseInt(laser.style.top);
-    laser.style.top = `${laserTop - 10}px`;
 
-    // detect et enleve laser en haut de l'écran
-    if (laserTop < 0) {
-      laser.remove();
-      lasers = lasers.filter((lz) => lz !== laser);
-    }
-
-    // Detecte la collision des lasers
-    obstacles.forEach((obstacle) => {
-      if (detectCollision(laser, obstacle)) {
-        obstacle.remove();
+    // interaction laser ennemie
+    if (laser.dataset.type === "enemy") {
+      laser.style.top = `${laserTop + 5}px`;
+      if (laserTop > gameArea.clientHeight) {
         laser.remove();
-
-
-        obstacles = obstacles.filter((obs) => obs !== obstacle);
         lasers = lasers.filter((lz) => lz !== laser);
-
-
-        score += 10;
-        updateScore();
+        return;
       }
-    });
+
+      // Collision avec le joueur = gameover
+      if (detectCollision(laser, player)) {
+        endGame();
+        return;
+      }
+    } else {
+      // laser detruit au bout de l'ecran
+      laser.style.top = `${laserTop - 10}px`;
+      if (laserTop < 0) {
+        laser.remove();
+        lasers = lasers.filter((lz) => lz !== laser);
+        return;
+      }
+
+      // interactions avec laser joueur avec obstacles
+      obstacles.forEach((obstacle) => {
+        if (detectCollision(laser, obstacle)) {
+          obstacle.remove();
+          laser.remove();
+          obstacles = obstacles.filter((obs) => obs !== obstacle);
+          lasers = lasers.filter((lz) => lz !== laser);
+
+          score += 10;
+          updateScore();
+        }
+      });
+    }
   });
 }
 // Détecte les collisions
@@ -163,9 +217,17 @@ function gameLoop() {
   if (!gameOver) {
     moveObstacles();
     moveLasers();
-    if (Math.random() < 0.02) {
-      createObstacle();
+
+    // choisir le type d'obstacle
+    const rand = Math.random();
+    if (rand < 0.005) {
+      createObstacle("fast");
+    } else if (rand < 0.01) {
+      createObstacle("shooter");
+    } else if (rand < 0.05) {
+      createObstacle("normal");
     }
+
     requestAnimationFrame(gameLoop);
   }
 }
