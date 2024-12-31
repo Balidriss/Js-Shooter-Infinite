@@ -63,29 +63,19 @@ h1 span {
   margin-top: 10px;
 }
 
-#controls {
-  display: flex;
-  justify-content: space-around;
-  width: 100%;
-  background-color: #333;
-  padding: 10px;
+.obstacle.fast {
+  background-color: red;
 }
 
-#controls button {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  font-size: 24px;
-  background-color: #444;
-  color: white;
-  border: none;
-  cursor: pointer;
-  outline: none;
+.obstacle.shooter {
+  background-color: purple;
 }
 
-#controls button:active {
-  background-color: #555;
+.laser.enemy {
+  background-color: blue;
 }
+
+
 
 @media (max-width: 768px) {
   #player {
@@ -104,12 +94,6 @@ h1 span {
   }
 
   #score {
-    font-size: 18px;
-  }
-
-  #controls button {
-    width: 50px;
-    height: 50px;
     font-size: 18px;
   }
 

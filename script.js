@@ -1,224 +1,216 @@
-// Récupère les éléments principaux dans le DOM
-const player = document.getElementById('player');
-const gameArea = document.getElementById('gameArea');
-const scoreDisplay = document.getElementById('score');
+import { GAMEENV } from "./GAMEENV.js";
 
-// Initialise les propriétés principales du jeu
-let playerPosition = gameArea.clientWidth / 2 - player.clientWidth / 2;
-let score = 0;
-let gameOver = false;
-let obstacles = [];
-let lasers = [];
+// Load env
+GAMEENV.initialize();
 
-let startX = 0;
+// Main game variables
+const player = GAMEENV.PLAYER;
+const gameArea = GAMEENV.GAMEAREA;
+const scoreDisplay = GAMEENV.SCORE;
+const playerWidth = GAMEENV.PLAYERWIDTH;
+let lastTime = 0;
 
-// Detecte debut swipe
-gameArea.addEventListener('touchstart', function (event) {
-  startX = event.touches[0].clientX;
-});
+// Initialize controls
+const keyboardControl = GAMEENV.keyboardControl;
+const touchControl = GAMEENV.touchControl;
 
-// Detect swipe fin et determine la direction
-gameArea.addEventListener('touchend', function (event) {
-  const endX = event.changedTouches[0].clientX;
-  const diffX = endX - startX;
+// Configur player movment
+function movePlayer(deltaTime) {
+  const currentPosition = GAMEENV.playerPosition;
 
-  if (diffX > 30) {
-    // Swipe right
-    movePlayer(20);
-  } else if (diffX < -30) {
-    // Swipe left
-    movePlayer(-20);
-  }
-});
-// mouvements
-document.getElementById('moveLeft').addEventListener('click', function () {
-  movePlayer(-20);
-});
-document.getElementById('moveRight').addEventListener('click', function () {
-  movePlayer(20);
-});
+  // Use active control inputs
+  const keyboardTarget = keyboardControl.direction !== 0
+      ? keyboardControl.getTargetPosition(currentPosition, playerWidth)
+      : currentPosition;
 
-// Tire laser
-document.getElementById('shoot').addEventListener('click', function () {
-  shootLaser();
-});
+  const touchTarget = touchControl.targetX > 0
+      ? touchControl.getTargetPosition(currentPosition, playerWidth)
+      : currentPosition;
 
+  // Combine inputs
+  GAMEENV.playerPosition = touchControl.targetX > 0 && keyboardControl.direction !== 0
+      ? (keyboardTarget + touchTarget) / 2
+      : touchControl.targetX > 0
+          ? touchTarget
+          : keyboardTarget;
 
-// Écoute les touches gauche et droite pour appeler les fonctions de mouvement respectives
-document.addEventListener('keydown', function (event) {
-  if (event.key === 'ArrowLeft') {
-    movePlayer(-20);
-  } else if (event.key === 'ArrowRight') {
-    movePlayer(20);
-  } else if (event.key === ' ') {
-    shootLaser();
-  }
-});
-
-// Déplace le joueur
-function movePlayer(direction) {
-  playerPosition += direction;
-  // S'assure que la position du joueur ne sort pas de l'écran
-  if (playerPosition < 0) {
-    playerPosition = 0;
-  } else if (playerPosition + player.clientWidth > gameArea.clientWidth) {
-    playerPosition = gameArea.clientWidth - player.clientWidth;
-  }
-  player.style.left = `${playerPosition}px`;
+  // Keep player in game bounds
+  GAMEENV.playerPosition = Math.max(0, Math.min(GAMEENV.GAMEWIDTH - playerWidth, GAMEENV.playerPosition));
+  player.style.left = `${GAMEENV.playerPosition}px`;
 }
 
-// Crée un obstacle et l'ajoute à la liste
+// Create a laser
+function shootLaser() {
+  const laser = document.createElement("div");
+  laser.classList.add("laser");
+
+  // Position the laser at the center-top of the player
+  laser.style.left = `${GAMEENV.playerPosition + playerWidth / 2 - 2}px`;
+  laser.style.top = `${player.offsetTop - 10}px`;
+
+  gameArea.appendChild(laser);
+  GAMEENV.lasers.push(laser);
+}
+
+// Start automatic shooting
+function startAutoShooting(rateOfFire = 500) {
+  if (GAMEENV.autoShootInterval) clearInterval(GAMEENV.autoShootInterval);
+  GAMEENV.autoShootInterval = setInterval(() => {
+    if (!GAMEENV.gameOver) shootLaser();
+  }, rateOfFire);
+}
+
+// Create obstacle
 function createObstacle(type = "normal") {
-  const obstacle = document.createElement('div');
-  obstacle.classList.add('obstacle');
+  const obstacle = document.createElement("div");
+  obstacle.classList.add("obstacle");
   obstacle.dataset.type = type;
 
-  obstacle.style.left = `${Math.random() * (gameArea.clientWidth - gameArea.clientWidth * 0.1)}px`;
-  obstacle.style.top = '0px';
+  const obstacleLeft = Math.random() * (GAMEENV.GAMEWIDTH - GAMEENV.GAMEWIDTH * 0.1);
+  obstacle.style.left = `${obstacleLeft}px`;
+  obstacle.style.top = "-50px"; // Spawn well above the game area
 
-  //vitesse : 1 = trés lent, 10 = trés rapide
   if (type === "fast") {
-    obstacle.dataset.speed = 4; //
-    obstacle.style.backgroundColor = "red";
+    obstacle.dataset.speed = 4;
+    obstacle.classList.add("fast");
+
   } else if (type === "shooter") {
-    obstacle.dataset.speed = 2; //
-    obstacle.style.backgroundColor = "purple";
-    obstacle.dataset.shootTimer = Math.random() * 2000 + 1000;
+    obstacle.dataset.speed = 2;
+    obstacle.classList.add("shooter");
+    obstacle.dataset.shootTimer = GAMEENV.FIRST_SHOT_TIMER + (Math.random() * 1000); // first shoot timer ~ 1s
+    obstacle.dataset.shootInterval = GAMEENV.SHOT_INTERVAL; // Set a default shoot interval of 2 seconds
   } else {
-    obstacle.dataset.speed = 2; //
-    obstacle.style.backgroundColor = "green";
+    obstacle.dataset.speed = 2;
+
   }
 
-  gameArea.appendChild(obstacle);
-  obstacles.push(obstacle);
+  // Ensure no collision with the player on spawn
+  if (!GAMEENV.detectCollision(player, obstacle)) {
+    gameArea.appendChild(obstacle);
+    GAMEENV.obstacles.push(obstacle);
+  }
 }
 
-// Crée un laser
-function shootLaser() {
-  const laser = document.createElement('div');
-  laser.classList.add('laser');
-  laser.style.left = `${playerPosition + player.clientWidth / 2 - 2}px`;
-  laser.style.top = `${player.offsetTop}px`;
-  gameArea.appendChild(laser);
-  lasers.push(laser);
-}
-// enemies peuvent tirer des lasers
+// Shoot a laser from an obstacle that can shoot
 function shootObstacleLaser(obstacle) {
-  const laser = document.createElement('div');
-  laser.classList.add('laser');
-  laser.style.left = `${parseInt(obstacle.style.left) + obstacle.offsetWidth / 2 - 2}px`;
-  laser.style.top = `${parseInt(obstacle.style.top) + obstacle.offsetHeight}px`;
-  laser.dataset.type = "enemy";
+  const laser = document.createElement("div");
+  laser.classList.add("laser", "enemy"); // Enemy laser class for differentiation
+  laser.dataset.source = "enemy"; // Mark it as an enemy laser
+
+  // Position the laser at the center-bottom of the obstacle
+  laser.style.left = `${parseInt(obstacle.style.left) + obstacle.clientWidth / 2 - 2}px`;
+  laser.style.top = `${parseInt(obstacle.style.top) + obstacle.clientHeight}px`;
+
+  // Add the laser to the game area and lasers array
   gameArea.appendChild(laser);
-  lasers.push(laser);
+  GAMEENV.lasers.push(laser);
 }
 
-// Déplace les obstacles et gère les collisions
-function moveObstacles() {
-  obstacles.forEach((obstacle) => {
+// Move obstacles and handle collisions
+function moveObstacles(deltaTime) {
+  GAMEENV.obstacles.forEach((obstacle) => {
     const speed = parseInt(obstacle.dataset.speed);
     let obstacleTop = parseInt(obstacle.style.top);
     obstacle.style.top = `${obstacleTop + speed}px`;
 
-    // Supprimer les obstacles hors écran
-    if (obstacleTop > gameArea.clientHeight) {
+
+
+    // Remove obstacles that move out of bounds
+    if (obstacleTop > GAMEENV.GAMEHEIGHT) {
       obstacle.remove();
-      obstacles = obstacles.filter((obs) => obs !== obstacle);
+      GAMEENV.obstacles = GAMEENV.obstacles.filter((obs) => obs !== obstacle);
       return;
     }
 
-    // La condition de perdre la partie : se prendre un obstacle
-    if (detectCollision(player, obstacle)) {
+    // Game over condition: Player collides with an obstacle
+    if (GAMEENV.detectCollision(player, obstacle)) {
       endGame();
       return;
     }
 
-    // obstacle enemy ayant la capacité de tirer des lasers
+    // Shooter obstacle logic: Shoot lasers at regular intervals
     if (obstacle.dataset.type === "shooter") {
-      obstacle.dataset.shootTimer -= 15;
+      obstacle.dataset.shootTimer -= deltaTime;
+
       if (obstacle.dataset.shootTimer <= 0) {
-        shootObstacleLaser(obstacle);
-        obstacle.dataset.shootTimer = Math.random() * 2000 + 1000;
+        shootObstacleLaser(obstacle); // Fire laser from shooter
+        obstacle.dataset.shootTimer = obstacle.dataset.shootInterval; // Reset shoot timer
       }
     }
   });
 }
 
-// laser enemie et joueur
-function moveLasers() {
-  lasers.forEach((laser) => {
-    let laserTop = parseInt(laser.style.top);
+// Move lasers and handle collisions
+function moveLasers(deltaTime) {
+  GAMEENV.lasers.forEach((laser) => {
+    const laserTop = parseInt(laser.style.top);
 
-    // interaction laser ennemie
-    if (laser.dataset.type === "enemy") {
+    if (laser.dataset.source === "enemy") {
+      // Enemy laser moves down
       laser.style.top = `${laserTop + 5}px`;
-      if (laserTop > gameArea.clientHeight) {
+      if (laserTop > GAMEENV.GAMEHEIGHT) {
         laser.remove();
-        lasers = lasers.filter((lz) => lz !== laser);
+        GAMEENV.lasers = GAMEENV.lasers.filter((lz) => lz !== laser);
         return;
       }
 
-      // Collision avec le joueur = gameover
-      if (detectCollision(laser, player)) {
+      // If enemy laser collides with the player
+      if (GAMEENV.detectCollision(laser, player)) {
         endGame();
         return;
       }
     } else {
-      // laser detruit au bout de l'ecran
+      // Player laser moves up
       laser.style.top = `${laserTop - 10}px`;
       if (laserTop < 0) {
         laser.remove();
-        lasers = lasers.filter((lz) => lz !== laser);
+        GAMEENV.lasers = GAMEENV.lasers.filter((lz) => lz !== laser);
         return;
       }
 
-      // interactions avec laser joueur avec obstacles
-      obstacles.forEach((obstacle) => {
-        if (detectCollision(laser, obstacle)) {
+      // Player lasers should only destroy obstacles
+      GAMEENV.obstacles.forEach((obstacle) => {
+        if (GAMEENV.detectCollision(laser, obstacle)) {
           obstacle.remove();
           laser.remove();
-          obstacles = obstacles.filter((obs) => obs !== obstacle);
-          lasers = lasers.filter((lz) => lz !== laser);
+          GAMEENV.obstacles = GAMEENV.obstacles.filter((obs) => obs !== obstacle);
+          GAMEENV.lasers = GAMEENV.lasers.filter((lz) => lz !== laser);
 
-          score += 10;
-          updateScore();
+          // Score on destroying obstacles
+          GAMEENV.score += 10;
+          GAMEENV.updateScore();
         }
       });
     }
   });
 }
-// Détecte les collisions
-function detectCollision(col1, col2) {
-  const col1Rect = col1.getBoundingClientRect();
-  const col2Rect = col2.getBoundingClientRect();
 
-  return !(
-      col1Rect.top > col2Rect.bottom ||
-      col1Rect.bottom < col2Rect.top ||
-      col1Rect.right < col2Rect.left ||
-      col1Rect.left > col2Rect.right
-  );
-}
-
-// Met à jour le score
+// Update the score
 function updateScore() {
-  scoreDisplay.innerHTML = `Score : ${score}`;
+  scoreDisplay.innerHTML = `Score: ${GAMEENV.score}`;
 }
 
-// Fin de la partie
+// End the game
 function endGame() {
-  gameOver = true;
-  alert(`Game Over! Votre score final est de : ${score}`);
+  GAMEENV.gameOver = true;
+  clearInterval(GAMEENV.autoShootInterval);
+  alert(`Game Over! Your final score is: ${GAMEENV.score}`);
   window.location.reload();
 }
 
-// Boucle principale du jeu
-function gameLoop() {
-  if (!gameOver) {
-    moveObstacles();
-    moveLasers();
+function gameLoop(timestamp) {
+  // Calculate deltaTime (time difference between this frame and the last one)
+  const deltaTime = timestamp - lastTime;
+  lastTime = timestamp; // Update lastTime to the current timestamp
 
-    // choisir le type d'obstacle
+  console.log(deltaTime);
+
+  if (!GAMEENV.gameOver) {
+    movePlayer(deltaTime);
+    moveObstacles(deltaTime);
+    moveLasers(deltaTime);
+
+    // Spawn obstacles with random probabilities
     const rand = Math.random();
     if (rand < 0.005) {
       createObstacle("fast");
@@ -228,9 +220,12 @@ function gameLoop() {
       createObstacle("normal");
     }
 
+    // Request the next frame and continue the game loop
     requestAnimationFrame(gameLoop);
   }
 }
 
-// Démarrage du programme
-gameLoop();
+
+// Start the game
+startAutoShooting(GAMEENV.PLAYER_FIRERATE); // Start automatic shooting with a rate of fire of 500ms
+gameLoop(0);

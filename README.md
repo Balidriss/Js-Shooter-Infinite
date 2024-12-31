@@ -10,11 +10,9 @@ ___
 
 ->  Right
 
-Spacebar = Fire 
+### On mobile :
 
-### On mobile : 
-
-swipe or use buttons on screen
+Point finger where to go
 
 ___
 HTML5 CSS JavaScript
