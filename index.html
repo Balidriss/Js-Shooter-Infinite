@@ -7,13 +7,32 @@
   <title>JS Training</title>
 </head>
 <body>
+
 <h1>Shooter Infinite <span>(wip)</span></h1>
 <div id="score">Score : 0</div>
 <div id="gameWrapper">
   <div id="gameArea">
+    <div class="stars"></div>
     <div id="player"></div>
   </div>
 </div>
-<script type="module" src="script.js"></script>
+<script type="module" src="./js/main.js"></script>
+<script>
+  //todo
+  //la flemme
+  document.addEventListener("DOMContentLoaded", () => {
+    const starContainer = document.querySelector('.stars');
+    const starCount = 200;
+    for (let i = 0; i < starCount; i++) {
+      const star = document.createElement('div');
+      star.classList.add('star');
+      const x = Math.random() * window.innerWidth;
+      const y = Math.random() * window.innerHeight * 2;
+      star.style.left = x + 'px';
+      star.style.top = y + 'px';
+      starContainer.appendChild(star);
+    }
+  });
+</script>
 </body>
 </html>
