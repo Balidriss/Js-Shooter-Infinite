@@ -45,7 +45,7 @@ export class Laser {
                 if (gameState.detectCollision(this.element, obs.element)) {
                     obs.element.remove();
                     gameState.enemies = gameState.enemies.filter(o => o !== obs);
-                    return "hitenemy";
+                    return "hitEnemy";
                 }
             }
         }

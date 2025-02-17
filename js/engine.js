@@ -52,7 +52,7 @@ export class Engine {
                 if (result === "hitPlayer") {
                     this.endGame();
                     return false;
-                } else if (result === "hitObstacle") {
+                } else if (result === "hitEnemy") {
                     gameState.score += 10;
                     gameState.updateScore();
                     laser.element.remove();
